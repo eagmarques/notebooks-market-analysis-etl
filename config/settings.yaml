@@ -1,0 +1,21 @@
+etl:
+  # Price filter applied during transformation (R$)
+  price_min: 1000
+  price_max: 10000
+
+  # SQLite table name (must match dashboard config)
+  table_name: "notebooks"
+
+  # Paths (relative to project root)
+  raw_data_dir: "data/raw"
+  processed_dir: "data/processed"
+  analytics_dir: "data/analytics"
+  db_filename: "mercadolivre.db"
+  processed_filename: "notebooks.jsonl"
+
+  # File tracking
+  processed_log: "data/processed/.processed_files.log"
+
+dashboard:
+  table_name: "notebooks"
+  db_path: "data/analytics/mercadolivre.db"

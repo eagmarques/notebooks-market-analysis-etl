@@ -9,22 +9,38 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Data and Logs
+# ── Data layer ──────────────────────────────────────────────
+# Raw scraped files (always regenerated)
+data/raw/*.jsonl
+
+# Processed JSONL output
+data/processed/*.jsonl
+data/processed/.processed_files.log
+
+# Analytics DB: ignore by default in professional workflows.
+data/analytics/*.db
+
+# Legacy (root-level data files from before refactoring)
 data/*.json
 data/*.jsonl
 data/*.csv
-# Only ignore generic local DBs, but allow the project's analytical DB for demo
-# data/*.db
-# data/*.sqlite
-*.log
 
-# Scrapy stuff:
+# ── Scrapy ──────────────────────────────────────────────────
 .scrapy
 src/extraction/data_gathering/.scrapy/
+src/extraction/.scrapy/
 
-# Credentials
+# ── Credentials ─────────────────────────────────────────────
 .env
+config/.env
 
-# IDEs
+# ── Logs ────────────────────────────────────────────────────
+*.log
+
+# ── IDEs ────────────────────────────────────────────────────
 .vscode/
 .idea/
+
+# ── OS ──────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
