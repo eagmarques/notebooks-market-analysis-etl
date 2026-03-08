@@ -17,8 +17,8 @@ data/raw/*.jsonl
 data/processed/*.jsonl
 data/processed/.processed_files.log
 
-# Analytics DB: ignore by default in professional workflows.
-data/analytics/*.db
+# Analytics DB: committed for demo purposes on Streamlit Cloud.
+# data/analytics/*.db
 
 # Legacy (root-level data files from before refactoring)
 data/*.json
