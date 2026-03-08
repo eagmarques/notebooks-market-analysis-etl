@@ -99,22 +99,27 @@ make test         # Run unit tests
 make all          # extract + transform in sequence
 ```
 
-### Option 2 — Manual
+### Option 2 — Manual (Module Execution)
+
+Running scripts directly as files is not supported due to the package-based absolute imports (`src.transform...`). Use the following module executions:
 
 #### 1. Extract
 ```bash
-cd src/extraction/data_gathering
-scrapy crawl notebook
+# De dentro da pasta raiz
+scrapy crawl notebook --cwd src/extraction/data_gathering
+# Ou simplesmente
+cd src/extraction/data_gathering && scrapy crawl notebook
 ```
 
 #### 2. Transform & Load
 ```bash
-cd src/transform
-python main.py
+# Sempre da pasta raiz
+python -m src.transform.main
 ```
 
 #### 3. Dashboard
 ```bash
+# Sempre da pasta raiz
 streamlit run src/dashboard/app.py
 ```
 
@@ -136,18 +141,18 @@ Edit `config/settings.yaml` to adjust:
 ## 🧪 Running Tests
 
 ```bash
-make test
-# or
 python -m pytest tests/ -v
 ```
 
 ---
 
-## 📊 Features
+## 💎 Data Quality Features (Senior Revamp)
 
-- ✅ **Idempotent ETL**: tracks processed files — re-running never duplicates data
-- ✅ **Structured logging**: every ETL step logs row counts and warnings
-- ✅ **SQL Analytical Views**: `vw_brand_summary`, `vw_price_buckets`, `vw_top_sellers`
-- ✅ **Centralised config**: `settings.yaml` drives the full pipeline
-- ✅ **Modular codebase**: extraction, transform, and dashboard are fully decoupled
-- ✅ **Unit tested**: normalizers and cleaners covered by pytest
+This project was refactored to handle the complexities of real-world scraping:
+
+- 🧠 **Robust Brand Inference**: Multi-layered brand detection (Raw HTML → Keyword Matching → Fallback to "Unknown"). Now recognizes specific lines like *Ideapad, Nitro, Alienware, ROG, Legion*.
+- 🧹 **Noise Filtering**: Automatic exclusion of accessories (skins, chargers, cases, parts) using regex patterns to ensure the analytical database contains only valid notebooks.
+- 🩹 **Price Healing**: Automatically detects and heals suspicious prices (e.g., installments or mis-scraped values < R$500) and ensures `old_money >= new_money`.
+- ✅ **Advanced Deduplication**: Deduplicates based on a combination of `brand + name + seller + price`, ensuring same product offers from different vendors are preserved while duplicates are removed.
+- 🚀 **Idempotent ETL**: Tracks processed raw files in a local manifest to avoid redundant processing.
+- 📦 **Modern Package Architecture**: Uses absolute imports and standard project layout for maximum compatibility and scalability.

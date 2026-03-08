@@ -25,16 +25,22 @@ class NotebookSpider(scrapy.Spider):
                 or product.css("h2.ui-search-item__title::text").get()
             )
 
-            # Prices:
-            # - old_money: Only from the 'del' (deleted/original) price span
-            # - new_money: From the actual/current price span
-            old_money_raw = product.css('span.ui-search-price__part--del span.andes-money-amount__fraction::text').get()
+            # ── Price Extraction ──────────────────────────────────────────────
+            # - old_money: the original crossed-out price (using --previous class)
+            # - new_money: the actual current price (using --current class or fallback)
+            old_money_raw = product.css('.andes-money-amount--previous .andes-money-amount__fraction::text').get()
             
-            # For new_money, we look for the main price part. If not found, use the first fraction found.
             new_money_raw = (
-                product.css('div.ui-search-item__group--price span.andes-money-amount__fraction::text').get() or
-                product.css('span.poly-price__current span.andes-money-amount__fraction::text').get() or
-                product.css('span.andes-money-amount__fraction::text').get()
+                product.css('.andes-money-amount--current .andes-money-amount__fraction::text').get() or
+                product.css('.poly-price__current .andes-money-amount__fraction::text').get() or
+                product.css('.andes-money-amount:not(.andes-money-amount--previous) .andes-money-amount__fraction::text').get()
+            )
+
+            # ── Brand Extraction ──────────────────────────────────────────────
+            # Try specific brand component first, then fallback to discoverability tag
+            brand_raw = (
+                product.css('.poly-component__brand::text').get() or
+                product.css('span.ui-search-item__brand-discoverability::text').get()
             )
 
             # Sales & rating share the same CSS class; the first occurrence is the
@@ -43,6 +49,7 @@ class NotebookSpider(scrapy.Spider):
 
             yield {
                 "name": title,
+                "brand": brand_raw,
                 "seller": product.css("span.poly-component__seller::text").get(),
                 "reviews_rating_number": phrase_labels[0] if phrase_labels else None,
                 "sales_bucket": phrase_labels[-1] if phrase_labels else None,

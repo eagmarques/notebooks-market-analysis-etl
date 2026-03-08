@@ -20,7 +20,7 @@ extract:
 # ── Transform & Load ─────────────────────────────────────────
 transform:
 	@echo ">>> Running ETL pipeline..."
-	cd src/transform && python main.py
+	python -m src.transform.main
 
 # ── Dashboard ─────────────────────────────────────────────────
 dashboard:

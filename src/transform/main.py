@@ -12,9 +12,14 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-from cleaners import clean_prices, clean_reviews
-from loaders import load_to_jsonl, load_to_sqlite
-from normalizers import normalize_brand_series, normalize_sales_bucket
+from src.transform.cleaners import clean_prices, clean_reviews
+from src.transform.loaders import load_to_jsonl, load_to_sqlite
+from src.transform.normalizers import (
+    normalize_brand_series,
+    normalize_brand,
+    normalize_sales_bucket,
+    CANONICAL_BRANDS,
+)
 
 # ── Logging setup ──────────────────────────────────────────────────────────
 
@@ -118,25 +123,38 @@ def transform(
     rows_before = len(df)
     logger.info("Starting transformation with %d rows.", rows_before)
 
-    # 1 — Brand: derive from title (replaces spider-side heuristic)
-    df["brand"] = normalize_brand_series(df.get("name", df.get("title")))
+    # 1 — Brand handling: Keep raw brand if present, otherwise infer from name.
+    # We apply normalization (normalize_brand_series) in both cases to ensure consistency.
+    raw_brand = df.get("brand")
+    name_series = df.get("name", df.get("title"))
+
+    if raw_brand is not None:
+        # Fill missing raw brands with inference from name
+        df["brand"] = raw_brand.fillna(name_series.map(normalize_brand))
+        # Normalize the result (to catch cases where raw brand is not in canonical format)
+        df["brand"] = normalize_brand_series(df["brand"])
+    else:
+        # Fallback if the 'brand' column is completely missing from raw
+        df["brand"] = normalize_brand_series(name_series)
 
     # 2 — Clean and sanitize prices
     df["old_money"] = clean_prices(df["old_money"])
     df["new_money"] = clean_prices(df["new_money"])
     df["reviews_rating_number"] = clean_reviews(df["reviews_rating_number"])
 
-    # FILL missing new_money with old_money if available
+    # PRICE LOGIC:
+    # Use old_money as fallback for new_money if latter is missing
     df["new_money"] = df["new_money"].fillna(df["old_money"])
 
-    # SANITY CHECK: If old_money is suspiciously low (< 500) or lower than new_money,
-    # it is likely a scraping error (captured installment instead of original price).
-    invalid_old_money = (
+    # SANITY CHECK & ADJUSTMENT for old_money:
+    # If old_money is null, too low (< 500), or lower than new_money,
+    # sync it with new_money to ensure data quality and dashboard consistency.
+    invalid_old_money_mask = (
         df["old_money"].isna() |
         (df["old_money"] < 500) |
         (df["old_money"] < df["new_money"])
     )
-    df.loc[invalid_old_money, "old_money"] = df["new_money"]
+    df.loc[invalid_old_money_mask, "old_money"] = df["new_money"]
 
     # 3 — Normalize sales bucket
     df["sales_count_estimate"], df["sales_bucket"] = normalize_sales_bucket(
@@ -147,9 +165,11 @@ def transform(
     df["reviews_rating_number"] = df["reviews_rating_number"].fillna(0)
 
     # 5 — Deduplication
+    # We include 'seller' and 'sales_bucket' to ensure different offers are preserved,
+    # and 'brand' + 'name' to identify the product uniquely within those offers.
     dedup_cols = [
         "brand", "name", "old_money", "new_money",
-        "reviews_rating_number", "seller", "sales_bucket",
+        "seller", "sales_bucket"
     ]
     existing_dedup_cols = [c for c in dedup_cols if c in df.columns]
     df = df.drop_duplicates(subset=existing_dedup_cols, keep="last")
@@ -159,7 +179,21 @@ def transform(
         rows_before - len(df),
     )
 
-    # 6 — Price filter
+    # 6 — Noise filtering (Accessories & Parts)
+    # Exclude items that are clearly not notebooks (e.g. skins, cases, chargers)
+    noise_keywords = [
+        "capa", "skin", "pelicula", "bolsa", "maleta", "estojo", "case",
+        "fonte", "carregador", "bateria", "teclado", "mouse", "tela",
+        "display", "ssd", "memoria", "cabo", "dobradica", "carcaca",
+        "suporte", "cooler", "ventilador", "base", "adesivo", "hub", "adaptador"
+    ]
+    # Use non-capturing group (?:...) to avoid UserWarning about match groups
+    noise_regex = r"\b(?:" + "|".join(noise_keywords) + r")\b"
+    is_notebook = ~df["name"].str.contains(noise_regex, case=False, regex=True)
+    df = df[is_notebook]
+    logger.info("After noise filtering: %d rows.", len(df))
+
+    # 7 — Price filter
     price_mask = (
         df["new_money"].notna()
         & df["new_money"].between(price_min, price_max)
@@ -172,8 +206,12 @@ def transform(
             "Price filter [R$%.0f–R$%.0f] removed %d rows.",
             price_min, price_max, removed,
         )
+    
+    # 8 - Brand filter: Only keep items successfully identified as a known brand
+    df = df[df["brand"].isin(CANONICAL_BRANDS)]
+    logger.info("After brand filter: %d rows.", len(df))
 
-    # 7 — Metadata
+    # 9 — Metadata
     df = df.rename(columns={"url": "_source"}) if "url" in df.columns else df
     df["_datetime"] = datetime.now().isoformat()
 

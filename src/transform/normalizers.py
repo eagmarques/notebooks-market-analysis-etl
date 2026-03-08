@@ -15,10 +15,21 @@ BRAND_ALIASES: dict[str, str] = {
     "galaxy book": "Samsung",
     "macbook": "Apple",
     "legion": "Lenovo",
+    "ideapad": "Lenovo",
+    "thinkpad": "Lenovo",
+    "yoga": "Lenovo",
     "rog": "Asus",
     "hp": "HP",
+    "compaq": "HP",
     "lg": "LG",
     "msi": "MSI",
+    "chromebook": "Acer",
+    "aspire": "Acer",
+    "nitro": "Acer",
+    "predator": "Acer",
+    "swift": "Acer",
+    "alienware": "Dell",
+    "ultra": "Multilaser",
 }
 
 # Ordered by priority (more specific first when aliases overlap).
@@ -38,13 +49,25 @@ KNOWN_BRANDS: list[str] = [
     "vaio",
     "multilaser",
     "lg",
-    "compaq",
-    "ultra",
     "atfly",
     "msi",
     "gigabyte",
     "toshiba",
+    "realme",
+    "xiaomi",
+    "redmi",
+    "huawei",
+    "chuwi",
+    "teclast",
+    "concórdia",
+    "concórdia",
+    "philco",
 ]
+
+# Canonical brands returned by normalize_brand
+CANONICAL_BRANDS: set[str] = {
+    BRAND_ALIASES.get(b, b.capitalize()) for b in KNOWN_BRANDS
+}
 
 
 def normalize_brand(title: str | None) -> str | None:

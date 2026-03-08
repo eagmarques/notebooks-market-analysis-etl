@@ -30,7 +30,7 @@ class TestNormalizeBrand:
         assert normalize_brand("ASUS ROG Strix G15") == "Asus"
 
     def test_unknown_brand_returns_none(self):
-        assert normalize_brand("Notebook Ultra Slim") is None
+        assert normalize_brand("Notebook Generic Brand X") is None
 
     def test_none_input(self):
         assert normalize_brand(None) is None
