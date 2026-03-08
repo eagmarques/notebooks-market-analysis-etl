@@ -13,8 +13,9 @@ __pycache__/
 data/*.json
 data/*.jsonl
 data/*.csv
-data/*.db
-data/*.sqlite
+# Only ignore generic local DBs, but allow the project's analytical DB for demo
+# data/*.db
+# data/*.sqlite
 *.log
 
 # Scrapy stuff:
