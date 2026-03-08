@@ -1,0 +1,29 @@
+# Virtual environment
+.venv/
+env/
+venv/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data and Logs
+data/*.json
+data/*.jsonl
+data/*.csv
+data/*.db
+data/*.sqlite
+*.log
+
+# Scrapy stuff:
+.scrapy
+src/extraction/data_gathering/.scrapy/
+
+# Credentials
+.env
+
+# IDEs
+.vscode/
+.idea/
