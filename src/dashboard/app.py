@@ -40,7 +40,10 @@ def load_data(db_path: Path, table_name: str) -> pd.DataFrame:
     Load data from the SQLite database into a pandas DataFrame.
     """
     if not db_path.exists():
-        raise FileNotFoundError(f"Database file not found: {db_path}")
+        raise FileNotFoundError(
+            f"Database file not found: {db_path}. "
+            "Please run the ETL pipeline (python src/transformLoad/main.py) to generate it."
+        )
 
     query = f"SELECT * FROM {table_name}"
 
