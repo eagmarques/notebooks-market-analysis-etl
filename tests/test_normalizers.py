@@ -1,7 +1,7 @@
 """Tests for normalizers.py"""
 import pandas as pd
 import pytest
-from src.transform.normalizers import normalize_brand, normalize_brand_series, normalize_sales_bucket
+from src.transform.normalizers import normalize_brand, normalize_brand_series
 
 
 class TestNormalizeBrand:
@@ -49,21 +49,4 @@ class TestNormalizeBrandSeries:
         assert result[3] is None
 
 
-class TestNormalizeSalesBucket:
-    def test_simple_number(self):
-        count, bucket = normalize_sales_bucket(pd.Series(["150 vendidos"]))
-        assert count[0] == pytest.approx(150.0)
-        assert str(bucket[0]) == "100-500"
 
-    def test_mil_multiplier(self):
-        count, bucket = normalize_sales_bucket(pd.Series(["+2 mil vendidos"]))
-        assert count[0] == pytest.approx(2000.0)
-        assert str(bucket[0]) == "1k-5k"
-
-    def test_em_sentinel(self):
-        count, bucket = normalize_sales_bucket(pd.Series(["em estoque"]))
-        assert count[0] == pytest.approx(0.0)
-
-    def test_nan_input(self):
-        count, _ = normalize_sales_bucket(pd.Series([None]))
-        assert count[0] == pytest.approx(0.0)

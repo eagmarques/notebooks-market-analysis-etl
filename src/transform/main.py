@@ -17,7 +17,6 @@ from src.transform.loaders import load_to_jsonl, load_to_sqlite
 from src.transform.normalizers import (
     normalize_brand_series,
     normalize_brand,
-    normalize_sales_bucket,
     CANONICAL_BRANDS,
 )
 
@@ -110,11 +109,11 @@ def transform(
     Steps:
       1. Infer brand from title (if not present or incomplete)
       2. Clean prices and reviews
-      3. Normalize sales bucket
-      4. Fill missing values
-      5. Deduplicate
+      3. Fill missing values
+      4. Deduplicate
       6. Apply price filter
       7. Add metadata columns
+      8. Remove items that brand is not in the list of brands
     """
     if df.empty:
         return df
@@ -156,10 +155,8 @@ def transform(
     )
     df.loc[invalid_old_money_mask, "old_money"] = df["new_money"]
 
-    # 3 — Normalize sales bucket
-    df["sales_count_estimate"], df["sales_bucket"] = normalize_sales_bucket(
-        df["sales_bucket"]
-    )
+    # 3 — Keep raw sales fact (no estimation)
+    # The 'sales_bucket' column already contains the raw text from Scrapy.
 
     # 4 — Fill missing reviews
     df["reviews_rating_number"] = df["reviews_rating_number"].fillna(0)

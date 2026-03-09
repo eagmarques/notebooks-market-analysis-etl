@@ -1,0 +1,15 @@
+﻿--- Verifying Data Layer ---
+Loaded 572 rows from DB.
+Data preparation successful.
+Columns: ['name', 'brand', 'seller', 'reviews_rating_number', 'sales_bucket', 'old_money', 'new_money', '_source', 'source_file', '_datetime', 'price', 'old_price', 'rating', 'price_bucket', 'demand_level', 'discount_amount', 'discount_pct']
+Price buckets: ['Premium', 'Mid-range', 'Budget']
+Demand levels: ['Low demand', 'Medium demand', 'High demand']
+KPIs: {'total_listings': 572, 'avg_price': np.float64(4549.875874125874), 'avg_rating': np.float64(4.75049504950495), 'pct_discounted': np.float64(19.755244755244757), 'high_demand_count': np.int64(16)}
+Insights generated:
+- **Lenovo** dominates the current selection with 151 listings.
+- The **Mid-range** segment is the most populated, suggesting it's the market's sweet spot.
+- **Low demand** is the most frequent demand level observed.
+- There is a notable cluster of **highly-rated products (4.5+)** in the **High demand** segment.
+
+--- Verifying Visualization Layer (Sample) ---
+Chart figure created successfully.

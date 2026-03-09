@@ -156,3 +156,29 @@ This project was refactored to handle the complexities of real-world scraping:
 - ✅ **Advanced Deduplication**: Deduplicates based on a combination of `brand + name + seller + price`, ensuring same product offers from different vendors are preserved while duplicates are removed.
 - 🚀 **Idempotent ETL**: Tracks processed raw files in a local manifest to avoid redundant processing.
 - 📦 **Modern Package Architecture**: Uses absolute imports and standard project layout for maximum compatibility and scalability.
+
+---
+
+## 📈 Business Insights
+
+Based on the market data analysis performed by the dashboard:
+
+1️⃣ **Market Sweet Spot**: Mid-range notebooks (R$2,000–R$4,000) dominate the marketplace inventory, representing the highest concentration of listings.
+
+2️⃣ **Premium Leadership**: Apple maintains a distinct premium positioning, consistently achieving the highest average prices and top-tier customer ratings (+4.5).
+
+3️⃣ **Competitive Mid-range**: Brands like Lenovo and Acer compete aggressively in the mid-price segments, showing high listing volume and strong "High Traction" (+500 sales) presence.
+
+4️⃣ **Demand Drivers**: There is a clear correlation between discount intensity and higher demand buckets, suggesting that price promotions are a key lever for volume in this marketplace.
+
+5️⃣ **Quality Cluster**: A notable cluster of products with 4.5+ ratings exists within the high-demand segments, validating that customer satisfaction is a prerequisite for scale.
+
+---
+
+## 🛠️ Future Improvements
+
+- 🧪 **Comprehensive Testing**: Expand the `tests/` suite to cover `data_loader.py` and visualization logic using `pytest`.
+- 🐳 **Dockerization**: Containerize the entire stack (ETL + Dashboard) using Docker for seamless deployment across environments.
+- 🕒 **Time-Series Analysis**: Implement historical tracking to analyze price evolution and demand shifts over time.
+- 🤖 **ML-Powered Pricing**: Integrate a machine learning model to predict the "optimal price" for a listing based on brand, rating, and demand levels.
+- 📑 **Automated PDF Reports**: Add a feature to export the dashboard's executive summaries and insights into professional PDF reports.

@@ -39,7 +39,7 @@ def load_data(db_path: Path, table_name: str) -> pd.DataFrame:
 
 # ── Validation ──────────────────────────────────────────────────────────────
 
-REQUIRED_COLUMNS = ["brand", "new_money", "old_money", "reviews_rating_number"]
+REQUIRED_COLUMNS = ["brand", "new_money", "old_money", "reviews_rating_number", "sales_bucket"]
 
 
 def validate_columns(df: pd.DataFrame) -> None:
@@ -49,47 +49,68 @@ def validate_columns(df: pd.DataFrame) -> None:
         raise ValueError(f"Missing required columns: {', '.join(missing)}")
 
 
-# ── Data preparation ────────────────────────────────────────────────────────
-
 def prepare_data(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Light preparation layer for the dashboard.
-    Heavy cleaning (price parsing, brand inference) is the ETL's responsibility.
-    Here we only: rename columns, guard against bad values, and compute discounts.
+    Analytical preparation layer for the dashboard.
+    Computes derived fields for marketplace analysis: price buckets, demand levels, etc.
     """
     df = df.copy()
 
-    # Rename to a business-friendly analytical name
-    df = df.rename(columns={"reviews_rating_number": "average_rating"})
+    # 1. Basic Cleaning & Renaming
+    df["price"] = pd.to_numeric(df["new_money"], errors="coerce")
+    df["old_price"] = pd.to_numeric(df["old_money"], errors="coerce")
+    df["rating"] = pd.to_numeric(df["reviews_rating_number"], errors="coerce").clip(0, 5)
+    
+    # Standardize brand (already cleaned in ETL, but defensive here)
+    df["brand"] = df["brand"].fillna("Unknown").astype(str)
 
-    # Guard against residual NaN-like strings from older ETL runs
-    df["brand"] = (
-        df["brand"]
-        .astype(str)
-        .str.strip()
-        .replace({"None": pd.NA, "nan": pd.NA, "": pd.NA})
-        .fillna("Unknown")
+    # 2. Price Buckets
+    def get_price_bucket(p):
+        if p < 2000:
+            return "Budget"
+        if p < 5000:
+            return "Mid-range"
+        return "Premium"
+
+    df["price_bucket"] = df["price"].apply(get_price_bucket)
+    # Ensure categorical order for charts
+    df["price_bucket"] = pd.Categorical(
+        df["price_bucket"], categories=["Budget", "Mid-range", "Premium"], ordered=True
     )
 
-    # Ensure numeric types (data stored in SQLite can come back as object)
-    for col in ["new_money", "old_money", "average_rating"]:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
+    # 3. Demand Levels (Robust numeric mapping)
+    sales_text = df["sales_bucket"].fillna("").astype(str).str.lower()
+    
+    # Extract numeric value
+    df["sales_estimate"] = (
+        sales_text
+        .replace(r"^em$", "0", regex=True)
+        .str.extract(r"(\d+)", expand=False)
+        .pipe(pd.to_numeric, errors="coerce")
+        .fillna(0)
+    )
+    
+    # Scale "mil" values
+    df.loc[sales_text.str.contains("mil|k", na=False), "sales_estimate"] *= 1000
+    
+    # Categorize using pd.cut
+    demand_bins = [0, 100, 500, 1000, 5000, 10000, float("inf")]
+    demand_labels = ["0-100", "100-500", "500-1k", "1k-5k", "5k-10k", "10k+"]
+    
+    df["demand_level"] = pd.cut(
+        df["sales_estimate"],
+        bins=demand_bins,
+        labels=demand_labels,
+        right=False
+    )
 
-    # Sanitize ratings: keep only [0, 5]
-    if "average_rating" in df.columns:
-        df.loc[~df["average_rating"].between(0, 5), "average_rating"] = pd.NA
-
-    # Derived discount metrics
-    if {"old_money", "new_money"}.issubset(df.columns):
-        df["discount_amount"] = df["old_money"] - df["new_money"]
-        valid_old = df["old_money"].gt(0)
-        df["discount_pct"] = (
-            df["discount_amount"].where(valid_old) / df["old_money"].where(valid_old) * 100
-        )
-        # SANITY GUARD: Discount must be within [0, 100]
-        if "discount_pct" in df.columns:
-            df["discount_pct"] = df["discount_pct"].clip(0, 100)
+    # 4. Discount Metrics (0-100 scale for percentage)
+    df["discount_amount"] = (df["old_price"] - df["price"]).clip(lower=0)
+    df["discount_pct"] = (
+        (df["discount_amount"] / df["old_price"].replace(0, pd.NA) * 100)
+        .fillna(0)
+        .clip(0, 100)
+    )
 
     return df
 
@@ -98,47 +119,46 @@ def prepare_data(df: pd.DataFrame) -> pd.DataFrame:
 
 def calculate_kpis(df: pd.DataFrame) -> dict:
     """Compute executive KPIs over the filtered dataset."""
-    price_df = df[df["new_money"].notna() & (df["new_money"] > 0)]
-    rating_df = df[df["average_rating"].notna() & (df["average_rating"] > 0)]
-
+    valid_price = df[df["price"] > 0]
+    valid_rating = df[df["rating"] > 0]
+    
     return {
         "total_listings": len(df),
-        "unique_brands": df["brand"].nunique(),
-        "avg_price": price_df["new_money"].mean() if not price_df.empty else 0.0,
-        "median_price": price_df["new_money"].median() if not price_df.empty else 0.0,
-        "avg_rating": rating_df["average_rating"].mean() if not rating_df.empty else 0.0,
-        "avg_discount_pct": df["discount_pct"].mean() if "discount_pct" in df.columns else 0.0,
+        "avg_price": valid_price["price"].mean() if not valid_price.empty else 0.0,
+        "avg_rating": valid_rating["rating"].mean() if not valid_rating.empty else 0.0,
+        "pct_discounted": (df["discount_pct"] > 0).mean() * 100,
+        "high_traction_count": (df["demand_level"].isin(["500-1k", "1k-5k", "5k-10k", "10k+"])).sum(),
     }
 
 
 # ── Insights ─────────────────────────────────────────────────────────────────
 
-def generate_insights(df: pd.DataFrame) -> dict:
-    """Generate quick business insights for executive reading."""
-    insights = {
-        "leader_brand": "N/A",
-        "highest_avg_price_brand": "N/A",
-        "best_rated_brand": "N/A",
-    }
-
+def generate_insights(df: pd.DataFrame) -> list[str]:
+    """Generate professional market insights based on the current data slice."""
     if df.empty:
-        return insights
+        return ["No data available for insights."]
 
+    insights = []
+    
+    # Brand dominance
     brand_counts = df["brand"].value_counts()
-    if not brand_counts.empty:
-        insights["leader_brand"] = brand_counts.idxmax()
+    top_brand = brand_counts.idxmax()
+    insights.append(f"**{top_brand}** dominates the current selection with {brand_counts.max()} listings.")
 
-    price_df = df[df["new_money"].notna() & (df["new_money"] > 0)]
-    if not price_df.empty:
-        insights["highest_avg_price_brand"] = (
-            price_df.groupby("brand")["new_money"].mean().idxmax()
-        )
+    # Price segment dominance
+    segment_counts = df["price_bucket"].value_counts()
+    top_segment = segment_counts.idxmax()
+    insights.append(f"The **{top_segment}** segment is the most populated, suggesting it's the market's sweet spot.")
 
-    rating_df = df[df["average_rating"].notna() & (df["average_rating"] > 0)]
-    if not rating_df.empty:
-        insights["best_rated_brand"] = (
-            rating_df.groupby("brand")["average_rating"].mean().idxmax()
-        )
+    # Demand levels
+    demand_counts = df["demand_level"].value_counts()
+    top_demand = demand_counts.idxmax()
+    insights.append(f"**{top_demand}** is the most frequent demand level observed.")
+
+    # Correlation insight (simple)
+    high_rating_high_demand = df[(df["rating"] >= 4.5) & (df["demand_level"] == "High demand")]
+    if len(high_rating_high_demand) > 0:
+        insights.append("There is a notable cluster of **highly-rated products (4.5+)** in the **High demand** segment.")
 
     return insights
 
@@ -151,11 +171,10 @@ def build_brand_summary_table(df: pd.DataFrame) -> pd.DataFrame:
         df.groupby("brand", as_index=False)
         .agg(
             total_listings=("brand", "size"),
-            avg_price=("new_money", "mean"),
-            median_price=("new_money", "median"),
-            avg_old_price=("old_money", "mean"),
-            avg_rating=("average_rating", "mean"),
-            avg_discount_pct=("discount_pct", "mean"),
+            avg_price=("price", "mean"),
+            avg_rating=("rating", "mean"),
+            avg_discount=("discount_pct", "mean"),
+            high_traction_share=("demand_level", lambda x: (x.isin(["500-1k", "1k-5k", "5k-10k", "10k+"])).mean() * 100)
         )
         .sort_values(["total_listings", "avg_price"], ascending=[False, False])
     )
@@ -164,24 +183,14 @@ def build_brand_summary_table(df: pd.DataFrame) -> pd.DataFrame:
 def format_summary_table(df: pd.DataFrame) -> pd.DataFrame:
     """Format numeric columns in the summary table for display."""
     formatted = df.copy()
-
-    def fmt_money(x):
-        return f"R$ {x:,.2f}" if pd.notna(x) else "-"
-
-    def fmt_pct(x):
-        return f"{x:.2f}%" if pd.notna(x) else "-"
-
-    def fmt_rating(x):
-        return f"{x:.2f}" if pd.notna(x) else "-"
-
-    for col in ["avg_price", "median_price", "avg_old_price"]:
-        if col in formatted.columns:
-            formatted[col] = formatted[col].apply(fmt_money)
-
-    if "avg_discount_pct" in formatted.columns:
-        formatted["avg_discount_pct"] = formatted["avg_discount_pct"].apply(fmt_pct)
-
+    
+    if "avg_price" in formatted.columns:
+        formatted["avg_price"] = formatted["avg_price"].apply(lambda x: f"R$ {x:,.2f}")
     if "avg_rating" in formatted.columns:
-        formatted["avg_rating"] = formatted["avg_rating"].apply(fmt_rating)
+        formatted["avg_rating"] = formatted["avg_rating"].apply(lambda x: f"{x:.2f}")
+    if "avg_discount" in formatted.columns:
+        formatted["avg_discount"] = formatted["avg_discount"].apply(lambda x: f"{x:.1f}%")
+    if "high_traction_share" in formatted.columns:
+        formatted["high_traction_share"] = formatted["high_traction_share"].apply(lambda x: f"{x:.1f}%")
 
     return formatted
