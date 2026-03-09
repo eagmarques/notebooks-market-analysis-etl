@@ -182,7 +182,9 @@ def transform(
         "capa", "skin", "pelicula", "bolsa", "maleta", "estojo", "case",
         "fonte", "carregador", "bateria", "teclado", "mouse", "tela",
         "display", "ssd", "memoria", "cabo", "dobradica", "carcaca",
-        "suporte", "cooler", "ventilador", "base", "adesivo", "hub", "adaptador"
+        "suporte", "cooler", "ventilador", "base", "adesivo", "hub", "adaptador",
+        "placa", "peças", "gabinete", "para o", "para", "peça", "dobradiças",
+        "moldura", "tela", "compatible ", "compatível", 
     ]
     # Use non-capturing group (?:...) to avoid UserWarning about match groups
     noise_regex = r"\b(?:" + "|".join(noise_keywords) + r")\b"
