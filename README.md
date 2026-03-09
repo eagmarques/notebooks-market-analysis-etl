@@ -2,6 +2,8 @@
 
 An end-to-end data pipeline for competitive analysis of the notebook market on Mercado Livre.
 
+🔗 **Live Demo:** [notebooks-market-bi.streamlit.app](https://notebooks-market-bi.streamlit.app/)
+
 > This portfolio project simulates a real-world consulting scenario: a company hiring a data team to evaluate the competitive landscape of the Brazilian notebook market.
 
 ---
